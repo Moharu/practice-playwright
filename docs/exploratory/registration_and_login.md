@@ -28,7 +28,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Steps:** Open Sign up, enter `1234` in the password field.
 - **Expected:** One consistent rule across the UI hint and the validation message.
 - **Actual:** The UI states 8 characters minimum, but the error dialog says "Password must be minimal 6 characters long." The length rules conflict (8 vs. 6). The dialog also says "Password can not include invalid characters.", which is misleading for a numeric input.
-- **Evidence:** ![Password field showing conflicting length messages](images/01/D-01-password-conflicting-messages.png)
+- **Evidence:** ![Password field showing conflicting length messages](images/01/D-01-password-conflict.png)
 - **Severity:** Medium
 
 ### D-02: Password strength bar only updates after the Password input regains focus
