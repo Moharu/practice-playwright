@@ -30,6 +30,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Actual:** The UI states 8 characters minimum, but the error dialog says "Password must be minimal 6 characters long." The length rules conflict (8 vs. 6). The dialog also says "Password can not include invalid characters.", which is misleading for a numeric input.
 - **Evidence:** ![Password field showing conflicting length messages](images/01/D-01-password-conflict.png)
 - **Severity:** Medium
+- **Issue:** [#1](https://github.com/Moharu/practice-playwright/issues/1)
 
 ### D-02: Password strength bar only updates after the Password input regains focus
 - **Area:** Registration, password strength indicator
@@ -43,6 +44,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Notes:** The same functionality exists in the profile page and seems to work as intended.
 - **Evidence:** ![Password strength bar not updating until the field is refocused](images/01/D-02-strength-inconsistent.gif)
 - **Severity:** Low
+- **Issue:** [#2](https://github.com/Moharu/practice-playwright/issues/2)
 
 ### D-03: Phone number validation differs between sign-up and profile
 - **Area:** Registration and profile, phone field
@@ -54,6 +56,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
   - ![Phone input field allows a minimal input](images/01/D-03-registration-phone-input.png)
   - ![Profile phone input has a minimum length enforced](images/01/D-03-profile-phone-input.png)
 - **Severity:** Medium
+- **Issue:** [#3](https://github.com/Moharu/practice-playwright/issues/3)
 
 ### D-04: Error dialog shows "true" when the API is unreachable
 - **Area:** Registration, error handling
@@ -67,6 +70,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
   - ![Red dialog with the text "true"](images/01/D-04-error-api-fail.png)
   - ![Network request erroring](images/01/D-04-network-request.png)
 - **Severity:** Medium
+- **Issue:** [#4](https://github.com/Moharu/practice-playwright/issues/4)
 
 ### D-05: Stale "data leak" error remains next to the success message
 - **Area:** Profile, change password
@@ -75,6 +79,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Actual:** The green "Your password is successfully updated!" dialog appears while the earlier red "data leak" dialog is still visible.
 - **Evidence:** ![Red dialog with stale error displayed alongside success message dialog](images/01/D-05-stale-error-message.png)
 - **Severity:** Low
+- **Issue:** [#5](https://github.com/Moharu/practice-playwright/issues/5)
 
 ### D-06: "Failed to load TOTP setup details" shown on every profile visit after 2FA is enabled
 - **Area:** Profile, two-factor authentication
@@ -87,6 +92,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Notes:** See also Q-01 (no option found to disable 2FA).
 - **Evidence:** ![Network tab: POST /totp/setup returns 400 Bad Request with body "TOTP already enabled"](images/01/D-06-totp-setup-400.png)
 - **Severity:** Medium
+- **Issue:** [#6](https://github.com/Moharu/practice-playwright/issues/6)
 
 ---
 
@@ -148,5 +154,5 @@ New Password and Confirm New Password have an eye icon to reveal the typed value
 
 ## Next steps
 
-- [ ] Create a GitHub Issue for each confirmed defect and link it here (e.g. `D-01 → #1`).
+- [x] Create a GitHub Issue for each confirmed defect and link it here (D-01 → #1 through D-06 → #6).
 - [ ] Write test cases with IDs (`REG-01`, `AUTH-01`, ...) and mark which ones to automate.
