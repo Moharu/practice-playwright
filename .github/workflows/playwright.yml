@@ -33,11 +33,40 @@ jobs:
       - name: Start app under test
         run: |
           cd ../practice-software-testing
-          docker compose up -d
-          docker compose up -d web
-          docker compose exec -u root laravel-api sh -c "chmod -R 777 storage bootstrap/cache"
-          docker compose exec laravel-api php artisan migrate:fresh --seed
 
+          # Start/build the app stack
+          docker compose up -d --build
+
+          # Ensure Composer dependencies are present before running artisan
+          for i in $(seq 1 20); do
+            if docker compose exec -T laravel-api test -f vendor/autoload.php; then
+              break
+            fi
+            echo "Waiting for Composer dependencies to be installed..."
+            sleep 2
+          done
+
+          if ! docker compose exec -T laravel-api test -f vendor/autoload.php; then
+            echo "Installing Composer dependencies..."
+            docker compose exec -T laravel-api composer install --no-interaction --prefer-dist --no-progress
+          fi
+
+          # Fix writable permissions
+          docker compose exec -u root laravel-api sh -c "chmod -R 777 storage bootstrap/cache"
+
+          # Retry migrations until the database is ready
+          attempts=0
+          until docker compose exec -T laravel-api php artisan migrate:fresh --seed; do
+            attempts=$((attempts + 1))
+            if [ "$attempts" -ge 20 ]; then
+              echo "Database migrations failed after $attempts attempts" >&2
+              exit 1
+            fi
+            echo "Migrations failed; retrying in 3s..."
+            sleep 3
+          done
+
+          # Wait until the API is actually serving requests
           until curl -sf http://localhost:8091/brands > /dev/null; do
             echo "Waiting for API on http://localhost:8091..."
             sleep 3
