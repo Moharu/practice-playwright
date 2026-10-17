@@ -35,7 +35,7 @@
 
 | ID | Finding | Docs say | Result | Action |
 |---|---|---|---|---|
-| U-01 | "Unauthorized" for a wrong current password | Change Password S5 AC4 (also S4 AC2): a wrong current password shows a specific message, "Your current password does not matches with the password." The app shows "Unauthorized". The OpenAPI spec lists only 200 and 401 for the change-password endpoint, and its 401 body is "Unauthorized", so the UI may be showing the API's raw response instead of the documented message. | **Confirmed**, promoted to defect **D-07** | File a new issue (#7) |
+| U-01 | "Unauthorized" for a wrong current password | Change Password S5 AC4 (also S4 AC2): a wrong current password shows a specific message, "Your current password does not matches with the password." The app shows "Unauthorized". The OpenAPI spec lists only 200 and 401 for the change-password endpoint. A direct request with a wrong current password returns 400 with the documented message, and on a later retest the UI showed that same message while the session was valid. The "Unauthorized" dialog appears when the session is invalid: it was reproduced by logging out in a second tab and then submitting the form. The session 01 occurrence was most likely an expired session. | **Confirmed**, reframed as defect **D-07** (invalid session, not a wrong password) | Retitle and rewrite issue #7 |
 | U-02 | Data-leak warning disappears too quickly | Not documented. Only the profile update message (5 seconds) and the forgot-password confirmation (3 seconds) have stated durations. | **Spec gap** | Keep as a UX suggestion |
 | U-03 | Silent redirect after a password change | Change Password S5 AC6: success message, then logout after 5 seconds. | **Documented** | Keep only as a suggestion: tell the user why they are being logged out |
 | U-04 | Required-field markers are inconsistent | Not documented. | **Spec gap** | Keep as a UX suggestion |
@@ -53,6 +53,17 @@
 | Q-04 | Is the forced logout after a password change intended? | Yes. Change Password S5 AC6. | **Documented** |
 
 ---
+
+## Answers to the TBC items in the test cases
+
+| Test case | Question | Answer |
+|---|---|---|
+| REG-07 | Same phone limits on registration as the profile page? | Partly. The OpenAPI schema sets a maximum of 24 characters and no minimum for registration. A minimum is not documented anywhere, so the lower limit is not defined. Direct requests with phone `0` to the local API (`localhost:8091`) and to the deployed API both returned 201, so the API accepts a one-digit phone. Updating the profile with `0` through `PATCH /users/{id}` returns 422, so the two endpoints disagree. |
+| REG-10 | What happens on a duplicate email? | The message "Email is already in use." (Registration S5 AC5). **Resolved.** |
+| REG-11 | Date of birth rules? | **Resolved.** The format is YYYY-MM-DD (Registration S5 AC1), and the OpenAPI schema says the date must be between 18 and 75 years ago. |
+| PROF-03 | Is the redirect after a password change documented? | Yes: success message, then logout after 5 seconds (Change Password S5 AC6). **Resolved.** |
+| 2FA-04 | Can 2FA be disabled? | No story covers it. Still TBC. |
+| API-03, API-04 | Status codes and bodies for invalid input? | Partly. Registration lists 201, 400, 401, 403 and 409 (duplicate email). Requests with phone `0` to the local and deployed APIs both returned 201, so the API does not enforce a phone minimum on registration (API-04 answered). `PATCH /users/{id}` with phone `0` returns 422 with a message about allowed characters, so the update endpoint validates phone and registration does not. Login lists only 200 in the spec, but a real wrong-password request returned 401 Unauthorized (response body not recorded). The stories add 423 for a locked account, which has not been tested. |
 
 ## New findings from the docs
 
@@ -77,12 +88,14 @@ Behavior the stories describe that session 01 did not cover:
 - **Phone validation on update (verified with `PATCH /users/{id}`):** 6 digits are rejected (422), 7 and 24 digits are accepted (200), 25 digits are rejected (422), and `+55 (51) 1234-5678` is accepted (200). So the API enforces 7 to 24 characters, matching the profile page, but only on update and not on registration (D-03). Two further problems:
   1. The rejection for 6 digits says the phone "may only contain digits, spaces and the characters ( ) + - .", although the value is only digits, so the message hides the real rule. The 25-digit case shows that message plus an accurate length message. This is a new defect, **D-08**.
   2. The API accepts `+`, spaces, parentheses, hyphen and period, while the story says numeric only and the UI rejects `+` (U-06).
+  3. A value with no digits at all (`-------`) is also accepted (200), so the rule checks length and allowed characters, not that a phone number contains digits.
+- **Change-password errors are missing from the OpenAPI spec:** a wrong current password returns `400` with `{"success":false,"message":"Your current password does not matches with the password."}`, while the spec lists only 200 and 401. The API returns the documented message, and the UI displays it while the session is valid. The raw "Unauthorized" appears only with an invalid session (D-07).
 
 ## Summary
 
 | Result | Count | Items |
 |---|---|---|
-| Confirmed | 7 | D-01, D-02, D-03, D-04, D-05, D-06, U-01 (promoted to D-07) |
+| Confirmed | 7 | D-01, D-02, D-03, D-04, D-05, D-06, U-01 (reframed as D-07) |
 | Documented | 3 | U-03, U-05, Q-04 |
 | Spec gap | 6 | U-02, U-04, U-07, Q-01, Q-02, Q-03 |
 | Contradiction | 1 | U-06 (story vs. API) |
@@ -93,13 +106,12 @@ Not counted in the table: one documentation contradiction found in the OpenAPI s
 
 ## Follow-up
 
-- [ ] Comment on issues #1 to #6, and create issue #7 for D-07.
-- [ ] Add the `spec-gap` label and apply it to #3.
-- [ ] Add D-07 and the new findings to `registration_and_login.md`, and update its Oracles line to link to this file.
+- [x] D-07, D-08 and the new findings are added to `registration_and_login.md`, and its Oracles line links to this file.
 - [x] Read the OpenAPI spec for the API questions (done, see above).
 - [x] Short-phone registration confirmed against the local and deployed APIs (201).
 - [x] Wrong-password login returns 401 Unauthorized (API-03).
+- [x] A wrong-current-password request to `POST /users/change-password` returns 400 with the documented message, and the UI shows it while the session is valid.
+- [x] Logging out in a second tab and then submitting the change-password form reproduces the "Unauthorized" dialog, so D-07 is reframed as a session-handling defect.
 - [x] Profile phone check through `PATCH /users/{id}`: the API validates phone on update (422 for `0`) and does not on registration.
 - [x] Update rule isolated (see New findings): 7 to 24 characters, with `+` and punctuation accepted.
-- [ ] File D-08 (misleading phone validation message) as a new issue after D-07.
-- [ ] Tick the session 02 item in the README roadmap.
+- [x] A `PATCH` with `-------` (7 hyphens) returned 200, so the rule counts characters and does not require any digit.

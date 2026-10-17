@@ -7,14 +7,14 @@
 - **Application:** Practice Software Testing (sprint: 5, commit: `ae7caecb`)
 - **Environment:** Chrome Version 155.0, Windows 11 + WSL2, UI at `http://localhost:4200`, API at `http://localhost:8091`
 - **Test data:** new accounts created during this session (test@mail.com, test2@mail.com); seeded accounts not used. Outgoing email is captured by the local MailCatcher, so nothing leaves the machine.
-- **Oracles used:** This session was deliberately done without reading the project documentation, to simulate a first-time user. I judged behavior against (1) what the UI itself states, (2) consistency between screens, and (3) common conventions for forms and authentication. Documentation will be reviewed afterward (in Session 02).
+- **Oracles used:** This session was deliberately done without reading the project documentation, to simulate a first-time user. I judged behavior against (1) what the UI itself states, (2) consistency between screens, and (3) common conventions for forms and authentication. The documentation and the API were reviewed afterward in [Session 02](session_02_spec_review.md). Entries below are marked where that review changed a finding.
 
 ## Summary
 
 | Category | Count |
 |---|---|
-| Defects | 6 |
-| UX issues | 7 |
+| Defects | 8 |
+| UX issues | 6 (U-01 was reframed as D-07) |
 | Open questions | 4 |
 
 Highest priority: conflicting password rules on sign-up (D-01), inconsistent phone validation between sign-up and profile (D-03), and the 2FA error after a successful enable (D-06).
@@ -51,7 +51,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Steps:** (1) Register with phone `2`. (2) Open the profile page and edit the phone number.
 - **Expected:** The same validation rules on both screens.
 - **Actual:** Registration accepts `2`. The profile page enforces a minimum of 7 and a maximum of 24 digits.
-- **Not verified:** Whether the API itself also accepts the short value, or whether validation exists only in the front end.
+- **Verified in session 02:** The API also accepts the short value. `POST /users/register` with phone `0` returns 201 on both the local and the deployed API. `PATCH /users/{id}` with the same value returns 422, and the update rule is 7 to 24 characters. So the two endpoints disagree, and the inconsistency is in the API itself, not only in the UI.
 - **Evidence:**
   - ![Phone input field allows a minimal input](images/01/D-03-registration-phone-input.png)
   - ![Profile phone input has a minimum length enforced](images/01/D-03-profile-phone-input.png)
@@ -94,12 +94,38 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Severity:** Medium
 - **Issue:** [#6](https://github.com/Moharu/practice-playwright/issues/6)
 
+### D-07: Expired or invalid session shows a raw "Unauthorized" on change password
+- **Area:** Profile, change password and session handling
+- **Steps:**
+  1. Log in and open the profile page in tab A.
+  2. In tab B, open the same site and log out, which invalidates the session.
+  3. In tab A, enter a current password and a valid new password with a matching confirmation, then submit.
+- **Expected:** The user is told the session has ended, for example by being sent to the login page, or sees a clear message. The documentation does not describe session expiry, so this is based on common practice.
+- **Actual:** A red dialog with only the text "Unauthorized".
+- **Reproducibility:** Reproduced on the retest.
+- **Notes:** First logged as U-01, "wrong current password shows Unauthorized". That was a misreading. With a valid session, a wrong current password shows the documented message ("Your current password does not matches with the password."), and a direct API request returns it with a 400. The occurrence in session 01 was most likely an expired session, which is not confirmed. The OpenAPI spec returns 401 `{"message":"Unauthorized"}` for a request without a valid token, which is what the UI shows as is. Other authenticated actions were not checked.
+- **Evidence:** ![Red dialog with Unauthorized is displayed](images/01/D-07-unauthorized-error.png)
+- **Severity:** Low
+- **Issue:** [#7](https://github.com/Moharu/practice-playwright/issues/7)
+
+### D-08: Phone validation message on update does not describe the rule that failed
+- **Area:** API, profile phone (`PATCH /users/{id}`)
+- **Steps:** Log in through the API, then send `PATCH /users/{id}` with `{"phone":"123456"}`.
+- **Expected:** A message that names the rule that was broken, such as a minimum length.
+- **Actual:** `422` with "Phone number may only contain digits, spaces and the characters ( ) + - ." The value contains only digits, so the message is wrong. The real reason is the length.
+- **Other values tested:** `1234567` and 24 digits return 200. 25 digits return 422 with two messages, an accurate length message and the same misleading one. `+55 (51) 1234-5678` and `-------` (seven hyphens) return 200.
+- **Notes:** The 7 to 24 length rule is not documented. Because `-------` is accepted, the rule checks length and allowed characters but not that the phone contains digits. Related to D-03 (registration accepts a one-digit phone). The message was not compared with what the UI shows.
+- **Severity:** Low
+- **Issue:** [#8](https://github.com/Moharu/practice-playwright/issues/8)
+
 ---
 
 ## UX issues
 
 ### U-01: "Unauthorized" shown for a wrong current password
 Changing the password with an incorrect current password shows a red dialog that says only "Unauthorized". A user-friendly message would say the current password is incorrect.
+
+**Session 02:** reframed as defect D-07. With a valid session, a wrong current password shows the documented message. The raw "Unauthorized" appears when the session is invalid (expired, or logged out in another tab).
 
 ### U-02: Data-leak warning disappears too quickly
 The warning about a password found in a data leak vanishes fast enough that it is hard to read. This also matters for accessibility, since users need time to read and react to a message.
@@ -116,6 +142,8 @@ Users have to type the `-` separators manually. A date picker or an input mask w
 ### U-06: Phone field gives no guidance on format or country
 The phone field rejects `+`, which suggests no country code is expected, yet there is a country dropdown directly above it and no statement about which countries are supported.
 
+**Session 02:** the story says phone is numeric only, so the UI follows it. The API, however, accepts `+`, spaces, parentheses, hyphens and periods (a `PATCH` with `+55 (51) 1234-5678` returned 200), so the story and the API contradict each other.
+
 ### U-07: Current Password field has no show/hide toggle
 New Password and Confirm New Password have an eye icon to reveal the typed value, but Current Password does not. The input is masked, so the value is hidden with no way to verify it. That makes a mistyped current password harder to spot, especially since a wrong value only returns the unhelpful "Unauthorized" error (U-01). This may be intentional, so it's worth checking against the documentation.
 
@@ -125,10 +153,10 @@ New Password and Confirm New Password have an eye icon to reveal the typed value
 
 ## Open questions
 
-- **Q-01:** Should users be able to disable 2FA after enabling it? I did not find an option. (See also D-06.)
+- **Q-01:** Should users be able to disable 2FA after enabling it? I did not find an option. (See also D-06.) *Session 02: no story or endpoint for disabling 2FA exists, so this remains a spec gap.*
 - **Q-02:** Is the product limited to one country? The country dropdown suggests otherwise, and the phone field has no country code. (Related to U-06.)
 - **Q-03:** Sign-in front-end validation flags passwords of 2 characters or fewer, while the sign-up UI states 8. This is probably intentional, since login should not enforce the current policy for older accounts. The real inconsistency is within sign-up (D-01).
-- **Q-04:** Is the forced logout after a password change intended? (Related to U-03.)
+- **Q-04:** Is the forced logout after a password change intended? (Related to U-03.) *Session 02: yes, documented (Change Password, sprint 5 AC6): success message, then logout after 5 seconds.*
 
 ---
 
@@ -139,6 +167,7 @@ New Password and Confirm New Password have an eye icon to reveal the typed value
 - Enabling 2FA worked on the happy path (see D-06 for the error that follows).
 - The profile page enforces minimum and maximum phone length (but see D-03).
 - The password strength bar on the profile page updates correctly (but see D-02 for the sign-up page).
+- A wrong current password shows the documented message while the session is valid (retest in session 02; see D-07 for the invalid-session case).
 
 ---
 
@@ -155,4 +184,5 @@ New Password and Confirm New Password have an eye icon to reveal the typed value
 ## Next steps
 
 - [x] Create a GitHub Issue for each confirmed defect and link it here (D-01 → #1 through D-06 → #6).
-- [ ] Write test cases with IDs (`REG-01`, `AUTH-01`, ...) and mark which ones to automate.
+- [x] Review the findings against the documentation (see [Session 02](session_02_spec_review.md)).
+- [x] Write test cases with IDs (`REG-01`, `AUTH-01`, ...) and mark which ones to automate (see [test cases](../test-cases.md)).
