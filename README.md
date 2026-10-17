@@ -81,7 +81,7 @@ Open the HTML report with `npx playwright show-report`.
 - [x] Set up the environment (WSL2, Docker Engine, the application under test)
 - [x] Exploratory session 01: registration, login, profile
 - [x] File defects as GitHub Issues
-- [ ] Exploratory session 02: check findings against the project documentation
+- [x] Exploratory session 02: check findings against the project documentation
 - [ ] Test plan and test cases (`docs/`)
 - [ ] API tests (login, brands, products)
 - [ ] UI smoke tests (login, search, cart, checkout)
