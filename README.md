@@ -9,6 +9,7 @@ A QA automation portfolio project. It tests [Practice Software Testing](https://
 | Path | Contents |
 |---|---|
 | [`docs/exploratory/`](docs/exploratory/) | Exploratory testing session notes, with screenshots and GIFs as evidence |
+| [`docs/ai_assisted_test_case_workflow.md`](docs/ai_assisted_test_case_workflow.md) | Notes on how the suite was built and validated with AI assistance |
 | [`tests/`](tests/) | Playwright tests |
 | [`.github/workflows/`](.github/workflows/) | GitHub Actions workflow |
 | [`start-app.sh`](start-app.sh) | Starts the application under test in the right order and seeds the database |

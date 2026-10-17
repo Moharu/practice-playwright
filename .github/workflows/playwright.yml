@@ -1,27 +1,60 @@
 name: Playwright Tests
+
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+
 jobs:
-  test:
-    timeout-minutes: 60
+  e2e:
+    timeout-minutes: 90
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version: lts/*
-    - name: Install dependencies
-      run: npm ci
-    - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
-    - name: Run Playwright tests
-      run: npx playwright test
-    - uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() }}
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
+      - name: Check out test repo
+        uses: actions/checkout@v4
+
+      - name: Check out app under test
+        run: git clone https://github.com/testsmith-io/practice-software-testing.git ../practice-software-testing
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install test project dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers and OS dependencies
+        run: npx playwright install --with-deps
+
+      - name: Start app under test
+        run: |
+          cd ../practice-software-testing
+          docker compose up -d
+          docker compose up -d web
+          docker compose exec -u root laravel-api sh -c "chmod -R 777 storage bootstrap/cache"
+          docker compose exec laravel-api php artisan migrate:fresh --seed
+
+          until curl -sf http://localhost:8091/brands > /dev/null; do
+            echo "Waiting for API on http://localhost:8091..."
+            sleep 3
+          done
+
+          echo "App is ready"
+
+      - name: Run Playwright suite
+        run: |
+          npx playwright test tests/api-phase-1.spec.ts tests/ui-phase-2.spec.ts tests/defect-phase-3.spec.ts tests/boundary-phase-4.spec.ts --reporter=line
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
