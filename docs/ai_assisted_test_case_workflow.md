@@ -35,6 +35,8 @@ The first phase targeted the fast, stable API checks and verified the real respo
 
 This phase used live requests against `http://localhost:8091` and served as the contract baseline for later UI coverage.
 
+The API request bodies were checked against the published OpenAPI schema. For user registration, that means using `dob` and a nested `address` object rather than inferring request keys from UI labels. Response examples were treated as examples unless the schema defines a stronger constraint.
+
 ### Phase 2: UI smoke suite
 
 The second phase covered the core UI journeys:
@@ -63,7 +65,7 @@ This phase exercised edge cases such as:
 - age/date-of-birth boundary values
 - phone-length boundaries
 
-The first run of this phase exposed real mismatches between the documentation and the live app: the application accepted DOB values that the spec considered invalid. That mismatch was then converted into expected-failure checks so the suite stayed green while documenting the issue.
+The first run of this phase exposed mismatches between the OpenAPI age rule and the local app. The app accepts 17- and 76-year-old DOB values that the spec says should be rejected, and rejects a DOB on the exact 18th birthday that the tests expect to be valid. These cases remain visible as expected failures until the rule is clarified or the implementation is fixed.
 
 ## How AI assistance was used
 
@@ -77,7 +79,7 @@ The AI assistance supported the project in several ways:
 
 ## Important principle
 
-The tests were written to reflect the running application’s real contract, not just the idealized requirements. That is why the suite includes both:
+The tests use the published API schema for request names and shapes, then validate the documented expectations against the running application. Where those disagree, the suite distinguishes the intended behavior from the observed behavior. It includes both:
 
 - normal passing tests for verified behavior
 - expected-failure tests for confirmed known defects or gaps between documentation and product behavior

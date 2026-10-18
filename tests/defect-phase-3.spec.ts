@@ -45,7 +45,13 @@ test.describe('Defect regression phase 3', () => {
 
     const patch = await request.patch(`${API_BASE}/users/${user.id}`, {
       headers: { Authorization: `Bearer ${payload}` },
-      data: { phone: '12345' },
+      data: {
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        password: 'welcome01',
+        phone: '12345',
+      },
     });
 
     expect(patch.status()).toBe(422);

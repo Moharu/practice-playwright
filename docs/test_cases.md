@@ -42,7 +42,7 @@ These come from behavior found in session 02 and protect the shared test data:
 | REG-08 | Each required field is enforced in the UI | Submit with one required field empty, repeating for every required field (first name, last name, date of birth, street, postal code, city, state, country, phone, email, password) | Submission blocked, with a message on the empty field (S5 AC1) | Medium | No | UI | |
 | REG-09 | Invalid email format is rejected | Enter `abc`, `a@`, `@b.com`, and an address of 257 characters | Rejected (RFC-compliant format, maximum 256 characters) | Medium | No | UI | |
 | REG-10 | Duplicate email is rejected | Register twice with the same email | The second attempt shows "Email is already in use." (S5 AC5) | Medium | No | UI | |
-| REG-11 | Date of birth range | Enter dates 17, 18, 75 and 76 years ago, in the YYYY-MM-DD format | 18 and 75 accepted, 17 and 76 rejected (OpenAPI: between 18 and 75 years ago) | Medium | No | UI | |
+| REG-11 | Date of birth range | `POST /users/register` with `dob` values 17, 18, 75 and 76 years ago in YYYY-MM-DD format | OpenAPI expectation: 18 and 75 accepted; 17 and 76 rejected. Local API observation: 17 and 76 are accepted, while the exact 18th birthday is rejected. Keep these mismatches visible as expected-failure checks until clarified or fixed. | Medium | No | API | |
 | REG-12 | Meaningful error when the API is unreachable | Block the `/register` request (abort the route in Playwright) and submit valid data | A readable error message, not the text "true" | Medium | No | UI | [#4](https://github.com/Moharu/practice-playwright/issues/4) |
 | REG-13 | Name length limits | Enter a first name of 41 characters and a last name of 21 characters | Rejected (OpenAPI maximums: 40 and 20) | Low | No | UI | |
 
@@ -89,15 +89,17 @@ These come from behavior found in session 02 and protect the shared test data:
 
 ## API checks
 
+For user registration, follow the OpenAPI request shape: `dob` and a nested `address` object. The schema requires `first_name`, `last_name`, `email`, and `password`. The local API also validates postal codes against the selected country, so fixtures should use a valid combination.
+
 | ID | Title | Steps | Expected | Priority | Smoke | Type | Issue |
 |---|---|---|---|---|---|---|---|
 | API-01 | Brands endpoint returns data | `GET /brands` | 200 and a non-empty JSON list | High | Yes | API | |
-| API-02 | Login returns a token | `POST /users/login` with the seeded customer | 200 with `access_token`, `token_type` Bearer and `expires_in` | High | Yes | API | |
-| API-03 | Wrong credentials are rejected | `POST /users/login` with a wrong password for a disposable account | 401 Unauthorized (observed in session 02; the OpenAPI spec lists only 200) | High | No | API | |
+| API-02 | Login returns a token | `POST /users/login` with the seeded customer | 200 with `access_token`, string `token_type`, and numeric `expires_in`. Swagger's `Bearer` value is an example, so casing is not asserted. | High | Yes | API | |
+| API-03 | Wrong credentials are rejected | `POST /users/login` with a wrong password for a disposable account | Non-200 response (locally observed as 401; the OpenAPI spec lists only 200) | High | No | API | |
 | API-04 | Registration accepts a one-digit phone (characterization) | `POST /users/register` with phone `0` | 201. Documents the current behavior behind #3 | Low | No | API | [#3](https://github.com/Moharu/practice-playwright/issues/3) |
 | API-05 | Phone rule on update | `PATCH /users/{id}` with 6, 7, 24 and 25 digits, and `+55 (51) 1234-5678` | 422, 200, 200, 422, 200 (observed in session 02). Parameterize the values | Medium | No | API | [#3](https://github.com/Moharu/practice-playwright/issues/3) |
 | API-06 | Phone error message names the broken rule | `PATCH /users/{id}` with 6 digits | A message about the minimum length, not about allowed characters | Low | No | API | [#8](https://github.com/Moharu/practice-playwright/issues/8) |
-| API-07 | Duplicate email on registration | `POST /users/register` twice with the same email | 409 on the second request (OpenAPI) | Medium | No | API | |
+| API-07 | Duplicate email on registration | `POST /users/register` twice with the same email, using `dob` and nested `address` | 409 on the second request (OpenAPI) | Medium | No | API | |
 | API-08 | Registration with only the required API fields | `POST /users/register` with first name, last name, email and password only | TBC: the schema requires only these four, but the UI requires more | Medium | No | API | |
 | API-09 | TOTP setup when 2FA is already enabled | Send `POST /totp/setup` with the token of an account that already has 2FA enabled | 400 with an error message (OpenAPI). The API behaves as documented; the UI should not call it on load | Low | No | API | [#6](https://github.com/Moharu/practice-playwright/issues/6) |
 | API-10 | Locked account response | Lock a disposable account, then `POST /users/login` | 423 (story S5 AC4; not in the OpenAPI spec). TBC: verify | Medium | No | API | |
