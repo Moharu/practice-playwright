@@ -50,18 +50,6 @@ npx playwright install --with-deps
 npx playwright test
 ```
 
-## Why this project is relevant
-
-It shows practical QA automation work across the full lifecycle:
-
-- requirement interpretation
-- exploratory testing
-- defect reporting
-- regression automation
-- CI-ready execution against a real app
-
-This is the kind of work a recruiter or hiring manager can quickly understand: it is not just a toy example, it is a realistic automation workflow for a real application.
-
 ## About me
 
 Built by [João Vítor Bianchi Teló](https://www.linkedin.com/in/joaotelo) as a practical QA automation portfolio project.
