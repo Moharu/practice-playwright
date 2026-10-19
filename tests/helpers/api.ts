@@ -10,9 +10,6 @@ export const SEEDED_CUSTOMER = {
   password: 'welcome01',
 };
 
-// Meets every password rule: 8+ characters, upper and lower case, a number and a symbol.
-export const VALID_PASSWORD = 'Str0ng!Passw0rd';
-
 export interface UserPayload {
   first_name: string;
   last_name: string;
@@ -22,6 +19,7 @@ export interface UserPayload {
   dob: string;
   address: {
     street: string;
+    house_number: string;
     city: string;
     state: string;
     country: string;
@@ -37,6 +35,16 @@ export function uniqueEmail(prefix: string): string {
   const slug = prefix.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const random = Math.random().toString(36).slice(2, 8);
   return `qa-${slug}-${Date.now()}-${counter}-${random}@example.com`;
+}
+
+/**
+ * A password that meets every rule (8+ characters, upper and lower case, a number and a symbol)
+ * and is unique per call. A fixed, common password is rejected by the app's data-leak check
+ * with a 422, so never use a constant password for registration.
+ */
+export function uniquePassword(): string {
+  counter += 1;
+  return `A9!Tq${counter}${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /**
@@ -59,11 +67,12 @@ export function buildUser(overrides: Partial<UserPayload> = {}): UserPayload {
     first_name: 'QA',
     last_name: 'Tester',
     email: uniqueEmail('user'),
-    password: VALID_PASSWORD,
+    password: uniquePassword(),
     phone: '1234567',
     dob: dobYearsAgo(30),
     address: {
       street: 'Main Street 1',
+      house_number: '12',
       city: 'Testville',
       state: 'CA',
       country: 'US',

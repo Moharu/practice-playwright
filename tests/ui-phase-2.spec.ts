@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('UI phase 2', () => {
-  test('AUTH-01: login with valid credentials redirects to account', async ({ page }) => {
+  test('AUTH-01: login with valid credentials redirects to account @smoke', async ({ page }) => {
     await page.goto('http://localhost:4200/auth/login');
 
     await page.getByLabel('Email address *').fill('customer@practicesoftwaretesting.com');
@@ -12,7 +12,7 @@ test.describe('UI phase 2', () => {
     await expect(page).toHaveURL(/\/account/);
   });
 
-  test('SHOP-01: catalog loads and opens product detail', async ({ page }) => {
+  test('SHOP-01: catalog loads and opens product detail @smoke', async ({ page }) => {
     await page.goto('http://localhost:4200/');
 
     await expect(page.getByRole('heading', { name: 'Practice Software Testing - Toolshop' })).toBeVisible();

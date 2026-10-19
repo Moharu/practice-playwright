@@ -7,13 +7,13 @@
 - **Application:** Practice Software Testing (sprint: 5, commit: `ae7caecb`)
 - **Environment:** Chrome Version 155.0, Windows 11 + WSL2, UI at `http://localhost:4200`, API at `http://localhost:8091`
 - **Test data:** new accounts created during this session (test@mail.com, test2@mail.com); seeded accounts not used. Outgoing email is captured by the local MailCatcher, so nothing leaves the machine.
-- **Oracles used:** This session was deliberately done without reading the project documentation, to simulate a first-time user. I judged behavior against (1) what the UI itself states, (2) consistency between screens, and (3) common conventions for forms and authentication. The documentation and the API were reviewed afterward in [Session 02](session_02_spec_review.md). Entries below are marked where that review changed a finding.
+- **Oracles used:** This session was deliberately done without reading the project documentation, to simulate a first-time user. I judged behavior against (1) what the UI itself states, (2) consistency between screens, and (3) common conventions for forms and authentication. The documentation and the API were reviewed afterward in [Session 02](documentation_review.md). Entries below are marked where that review changed a finding.
 
 ## Summary
 
 | Category | Count |
 |---|---|
-| Defects | 8 |
+| Defects | 9 |
 | UX issues | 6 (U-01 was reframed as D-07) |
 | Open questions | 4 |
 
@@ -29,6 +29,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Expected:** One consistent rule across the UI hint and the validation message.
 - **Actual:** The UI states 8 characters minimum, but the error dialog says "Password must be minimal 6 characters long." The length rules conflict (8 vs. 6). The dialog also says "Password can not include invalid characters.", which is misleading for a numeric input.
 - **Evidence:** ![Password field showing conflicting length messages](images/01/D-01-password-conflict.png)
+- **Test:** REG-03 (`tests/defect-phase-3.spec.ts`), marked as a known failure.
 - **Severity:** Medium
 - **Issue:** [#1](https://github.com/Moharu/practice-playwright/issues/1)
 
@@ -55,6 +56,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Evidence:**
   - ![Phone input field allows a minimal input](images/01/D-03-registration-phone-input.png)
   - ![Profile phone input has a minimum length enforced](images/01/D-03-profile-phone-input.png)
+- **Test:** API-04 and PROF-02 / API-05 (`tests/api-phase-1.spec.ts`, `tests/boundary-phase-4.spec.ts`).
 - **Severity:** Medium
 - **Issue:** [#3](https://github.com/Moharu/practice-playwright/issues/3)
 
@@ -104,7 +106,7 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Actual:** A red dialog with only the text "Unauthorized".
 - **Reproducibility:** Reproduced on the retest.
 - **Notes:** First logged as U-01, "wrong current password shows Unauthorized". That was a misreading. With a valid session, a wrong current password shows the documented message ("Your current password does not matches with the password."), and a direct API request returns it with a 400. The occurrence in session 01 was most likely an expired session, which is not confirmed. The OpenAPI spec returns 401 `{"message":"Unauthorized"}` for a request without a valid token, which is what the UI shows as is. Other authenticated actions were not checked.
-- **Evidence:** ![Red dialog with Unauthorized is displayed](images/01/D-07-unauthorized-error.png)
+- **Evidence:** screenshot to be added
 - **Severity:** Low
 - **Issue:** [#7](https://github.com/Moharu/practice-playwright/issues/7)
 
@@ -115,8 +117,19 @@ Highest priority: conflicting password rules on sign-up (D-01), inconsistent pho
 - **Actual:** `422` with "Phone number may only contain digits, spaces and the characters ( ) + - ." The value contains only digits, so the message is wrong. The real reason is the length.
 - **Other values tested:** `1234567` and 24 digits return 200. 25 digits return 422 with two messages, an accurate length message and the same misleading one. `+55 (51) 1234-5678` and `-------` (seven hyphens) return 200.
 - **Notes:** The 7 to 24 length rule is not documented. Because `-------` is accepted, the rule checks length and allowed characters but not that the phone contains digits. Related to D-03 (registration accepts a one-digit phone). The message was not compared with what the UI shows.
+- **Test:** API-06 (`tests/defect-phase-3.spec.ts`), marked as a known failure.
 - **Severity:** Low
 - **Issue:** [#8](https://github.com/Moharu/practice-playwright/issues/8)
+
+### D-09: Registration accepts dates of birth older than 75 years
+- **Area:** Registration, date of birth (`POST /users/register`)
+- **Steps:** Register through the API with a `dob` of 75 years and 2 days, 75 years and 180 days, 75 years and 364 days, and 76 years and 2 days ago (relative to the day of testing).
+- **Expected:** Rejected with 422 and `{"dob":["Customer must be younger than 75 years old."]}`. The OpenAPI schema says the date must be between 18 and 75 years ago.
+- **Actual:** All four are accepted (201). A date of birth of 1930-01-01 (96 years) is rejected with that message, so the limit exists but is looser than documented. The exact cutoff has not been determined.
+- **Notes:** Found while automating REG-11. The lower limit works (17 years 363 days is rejected, 18 years 2 days accepted). An earlier "known mismatch" in the tests was a false positive caused by a wrong field name; this defect was found after correcting it.
+- **Test:** REG-11, "just over 75" (`tests/boundary-phase-4.spec.ts`), marked as a known failure.
+- **Severity:** Low
+- **Issue:** [#9](https://github.com/Moharu/practice-playwright/issues/9)
 
 ---
 
@@ -184,5 +197,5 @@ New Password and Confirm New Password have an eye icon to reveal the typed value
 ## Next steps
 
 - [x] Create a GitHub Issue for each confirmed defect and link it here (D-01 → #1 through D-06 → #6).
-- [x] Review the findings against the documentation (see [Session 02](session_02_spec_review.md)).
-- [x] Write test cases with IDs (`REG-01`, `AUTH-01`, ...) and mark which ones to automate (see [test cases](../test-cases.md)).
+- [x] Review the findings against the documentation (see [Session 02](documentation_review.md)).
+- [x] Write test cases with IDs (`REG-01`, `AUTH-01`, ...) and mark which ones to automate (see [test cases](../test_cases.md)).

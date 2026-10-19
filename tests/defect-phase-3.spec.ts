@@ -1,61 +1,40 @@
 import { test, expect } from '@playwright/test';
+import { API_BASE, authHeader, buildUser, createUser, knownDefect, uniqueEmail } from './helpers/api';
+import { fillRegistrationForm, submitRegistration } from './helpers/ui';
 
-const API_BASE = 'http://localhost:8091';
-
+// Each test describes the CORRECT behavior and is marked as an expected failure while its issue
+// is open. Run with CHECK_DEFECTS=1 to see the real failure and confirm it is the intended one.
 test.describe('Defect regression phase 3', () => {
-  test('REG-03: short password should show an 8-character minimum, without a misleading invalid-character message', async ({ page }) => {
-    test.fail(true, 'Issue #1: conflicting password rules on sign-up');
+  test('REG-03: a short password is rejected with a message consistent with the 8-character rule (#1)', async ({ page }) => {
+    knownDefect('Issue #1: conflicting password rules on sign-up');
 
-    await page.goto('http://localhost:4200/auth/register');
-    await page.locator('#first_name').fill('QA');
-    await page.locator('#last_name').fill('Short');
-    await page.locator('#dob').fill('2000-01-01');
-    await page.locator('#street').fill('Main');
-    await page.locator('#postal_code').fill('12345');
-    await page.locator('#city').fill('Testville');
-    await page.locator('#state').fill('SP');
-    await page.locator('#phone').fill('1234567');
-    await page.locator('#email').fill(`qa-short-${Date.now()}@example.com`);
-    await page.locator('#password').fill('1234');
+    // Every other field is valid, so the password is the only thing that can be wrong.
+    const user = buildUser({ email: uniqueEmail('reg-03'), password: '1234' });
+    await fillRegistrationForm(page, user);
+    await submitRegistration(page);
 
-    const message = page.locator('text=/at least|minimum|8 character/i');
-    await expect(message).toBeVisible();
-    await expect(page.locator('#password')).not.toHaveAttribute('aria-invalid', 'true');
+    // The message comes from the front end's own validation (no API call is made), so assert on the
+    // alert next to the password field. The app marks it with data-test="password-error".
+    const passwordAlert = page.locator('[data-test="password-error"]');
+    await expect(passwordAlert, 'an error should be shown for a 4-character password').toBeVisible();
+    await expect(passwordAlert, 'must not state the old 6-character rule').not.toContainText(/6 characters/i);
+    await expect(passwordAlert, 'must not mention invalid characters for a numeric password').not.toContainText(/invalid characters/i);
+    await expect(passwordAlert, 'should state the 8-character rule').toContainText(/\b8\b/);
   });
 
-  test('API-06: phone validation should mention the minimum-length rule when a 6-digit value is sent', async ({ request }) => {
-    test.fail(true, 'Issue #8: phone validation error message does not name the correct rule');
+  test('API-06: the phone error message for a 6-digit value names the length rule (#8)', async ({ request }) => {
+    knownDefect('Issue #8: phone validation message does not name the correct rule');
 
-    const login = await request.post(`${API_BASE}/users/login`, {
-      data: {
-        email: 'customer@practicesoftwaretesting.com',
-        password: 'welcome01',
-      },
+    // A disposable user: never modify the shared seeded customer.
+    const { token, id } = await createUser(request);
+
+    const patch = await request.patch(`${API_BASE}/users/${id}`, {
+      headers: authHeader(token),
+      data: { phone: '123456' },
     });
 
-    expect(login.status()).toBe(200);
-    const auth = await login.json();
-    const payload = auth.access_token;
-
-    const me = await request.get(`${API_BASE}/users/me`, {
-      headers: { Authorization: `Bearer ${payload}` },
-    });
-    expect(me.status()).toBe(200);
-    const user = await me.json();
-
-    const patch = await request.patch(`${API_BASE}/users/${user.id}`, {
-      headers: { Authorization: `Bearer ${payload}` },
-      data: {
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email,
-        password: 'welcome01',
-        phone: '12345',
-      },
-    });
-
+    // The value is rejected today, so this assertion passes and the one below is what fails.
     expect(patch.status()).toBe(422);
-    const body = await patch.json();
-    expect(JSON.stringify(body)).toContain('minimum');
+    expect(JSON.stringify(await patch.json())).toMatch(/at least|minimum|too short|\b7\b/i);
   });
 });

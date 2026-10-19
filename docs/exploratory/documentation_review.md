@@ -2,10 +2,11 @@
 
 ## Session info
 
-- **Date / duration:** 2026-10-17, ~40 min
+- **Date:** 2026-10-17 to 2026-10-18 (documentation and API review, then checks prompted by the automated tests)
 - **Charter:** Compare the findings from [session 01](registration_and_login.md) against the project documentation, and classify each one.
 - **Sources read:** the user stories for sprints 1 to 5 in the [Practice Software Testing documentation](https://testsmith-io.github.io/practice-software-testing/#/). The app under test is at sprint 5, so sprint 5 is the reference. Earlier sprints are cited only where they explain a difference.
   - The OpenAPI specification behind `http://localhost:8091/api/documentation` (Toolshop API 5.0.0), read in full on 2026-10-17. It describes request fields, limits and documented status codes, but not UI messages.
+- **Also used:** page snapshots and API responses captured while automating the tests (see New findings).
 - **Application:** Practice Software Testing (sprint: 5, commit: `ae7caecb`)
 - **Citation format:** story name, sprint and acceptance criterion, for example "Registration, S5 AC2". The documentation is paraphrased, not copied.
 
@@ -60,7 +61,7 @@
 |---|---|---|
 | REG-07 | Same phone limits on registration as the profile page? | Partly. The OpenAPI schema sets a maximum of 24 characters and no minimum for registration. A minimum is not documented anywhere, so the lower limit is not defined. Direct requests with phone `0` to the local API (`localhost:8091`) and to the deployed API both returned 201, so the API accepts a one-digit phone. Updating the profile with `0` through `PATCH /users/{id}` returns 422, so the two endpoints disagree. |
 | REG-10 | What happens on a duplicate email? | The message "Email is already in use." (Registration S5 AC5). **Resolved.** |
-| REG-11 | Date of birth rules? | **Resolved.** The format is YYYY-MM-DD (Registration S5 AC1), and the OpenAPI schema says the date must be between 18 and 75 years ago. |
+| REG-11 | Date of birth rules? | **Resolved.** The format is YYYY-MM-DD (Registration S5 AC1), and the OpenAPI schema says the date must be between 18 and 75 years ago. Checked against the API: the lower limit is enforced (422 with `{"dob":["Customer must be 18 years old."]}`), but the upper limit is looser than documented. Dates up to at least 76 years and 2 days are accepted, while 1930-01-01 is rejected with "Customer must be younger than 75 years old." (see D-09). The status is 422, while the OpenAPI spec lists only 400 for registration. |
 | PROF-03 | Is the redirect after a password change documented? | Yes: success message, then logout after 5 seconds (Change Password S5 AC6). **Resolved.** |
 | 2FA-04 | Can 2FA be disabled? | No story covers it. Still TBC. |
 | API-03, API-04 | Status codes and bodies for invalid input? | Partly. Registration lists 201, 400, 401, 403 and 409 (duplicate email). Requests with phone `0` to the local and deployed APIs both returned 201, so the API does not enforce a phone minimum on registration (API-04 answered). `PATCH /users/{id}` with phone `0` returns 422 with a message about allowed characters, so the update endpoint validates phone and registration does not. Login lists only 200 in the spec, but a real wrong-password request returned 401 Unauthorized (response body not recorded). The stories add 423 for a locked account, which has not been tested. |
@@ -80,11 +81,15 @@ Behavior the stories describe that session 01 did not cover:
 - **Documentation quirk:** the documented current-password message contains a grammar error ("does not matches"). Worth raising with the maintainers.
 - **Seeded credentials confirmed:** the OpenAPI login example uses `customer@practicesoftwaretesting.com` with the password `welcome01`.
 - **Forgot password contradicts itself:** the story says a new password is generated and emailed (Forgot Password S5 AC3), while the OpenAPI description says the endpoint sets the password to a fixed value, `welcome02`. **Test impact:** running forgot password against the seeded customer changes its password, so reseed afterward (`migrate:fresh --seed`) or use a disposable account.
-- **The API requires fewer fields than the UI:** the registration schema requires only first name, last name, email and password, while the stories mark date of birth, address, phone and more as required. Some required-field validation may exist only in the front end. Worth verifying with real requests (REG-08).
+- **The API requires fewer fields than the UI:** the registration schema requires only first name, last name, email and password, while the stories mark date of birth, address, phone and more as required. Some required-field validation exists only in the front end. Verified (API-08): a registration with a date of birth and no phone or address returns 201 with the address fields null.
 - **Date of birth rule:** the date must be between 18 and 75 years ago (OpenAPI schema). Boundary tests: 17, 18, 75 and 76 years.
 - **Field limits (OpenAPI):** first name 40, last name 20, email 256, phone 24, street 70, house number 10, city 40, state 40, country 40, postal code 10 characters.
 - **Tokens expire:** the login response includes `expires_in: 120` (unit not stated) and there is a `GET /users/refresh` endpoint. **Test impact:** a Playwright login fixture must refresh or re-login for long runs.
 - **Account state is visible through the API:** the user response includes `enabled`, `totp_enabled` and `failed_login_attempts`, which an admin token can use to verify locking and 2FA state in tests.
+- **The registration form differs from the sprint 5 story.** A page snapshot shows a required house number, a postal code that is validated for the selected country ("Please enter a valid postal code for the selected country."), and a note that street, city and state are filled in automatically (the `/postcode-lookup` endpoint in the OpenAPI spec). The story lists none of this and calls the postal code "numeric". **Test impact:** the UI needs a country and a postal code that match.
+- **Common passwords are rejected by a data-leak check.** The API returns `422` with `{"password":["The given password has appeared in a data leak. Please choose a different password."]}` for a common password such as `Str0ng!Passw0rd`. The feature is not in the stories. **Test impact:** every registered user needs a unique password. This message is also the API-level expected result for PROF-08.
+- **The password messages in D-01 come from the front end.** No API call is made: the alert (`data-test="password-error"`) already shows "Password must be minimal 6 characters long." and "Password can not include invalid characters." from client-side validation.
+- **Date of birth is enforced only on the lower side as documented (D-09).** 17 years 363 days is rejected and 18 years 2 days accepted. Over the upper limit, 75 years 2 days, 180 days, 364 days and 76 years 2 days are all accepted, while 1930-01-01 is rejected. Found while automating REG-11, after a wrong field name had produced a false "known mismatch".
 - **Phone validation on update (verified with `PATCH /users/{id}`):** 6 digits are rejected (422), 7 and 24 digits are accepted (200), 25 digits are rejected (422), and `+55 (51) 1234-5678` is accepted (200). So the API enforces 7 to 24 characters, matching the profile page, but only on update and not on registration (D-03). Two further problems:
   1. The rejection for 6 digits says the phone "may only contain digits, spaces and the characters ( ) + - .", although the value is only digits, so the message hides the real rule. The 25-digit case shows that message plus an accurate length message. This is a new defect, **D-08**.
   2. The API accepts `+`, spaces, parentheses, hyphen and period, while the story says numeric only and the UI rejects `+` (U-06).
@@ -102,16 +107,14 @@ Behavior the stories describe that session 01 did not cover:
 
 D-01 is the main case where the documentation history matters: the app's validation message follows the sprint 4 rule, and the UI hint follows sprint 5. The OpenAPI schema also requires a minimum of 8, so the "6 characters" message contradicts both the UI hint and the API contract.
 
-Not counted in the table: one documentation contradiction found in the OpenAPI spec (forgot password) and one new defect, D-08 (misleading phone validation message), both described in New findings.
+Not counted in the table: one documentation contradiction found in the OpenAPI spec (forgot password) and two new defects, D-08 (misleading phone validation message) and D-09 (upper date-of-birth limit not enforced as documented), all described in New findings.
 
 ## Follow-up
 
-- [x] D-07, D-08 and the new findings are added to `registration_and_login.md`, and its Oracles line links to this file.
-- [x] Read the OpenAPI spec for the API questions (done, see above).
-- [x] Short-phone registration confirmed against the local and deployed APIs (201).
-- [x] Wrong-password login returns 401 Unauthorized (API-03).
-- [x] A wrong-current-password request to `POST /users/change-password` returns 400 with the documented message, and the UI shows it while the session is valid.
-- [x] Logging out in a second tab and then submitting the change-password form reproduces the "Unauthorized" dialog, so D-07 is reframed as a session-handling defect.
-- [x] Profile phone check through `PATCH /users/{id}`: the API validates phone on update (422 for `0`) and does not on registration.
-- [x] Update rule isolated (see New findings): 7 to 24 characters, with `+` and punctuation accepted.
-- [x] A `PATCH` with `-------` (7 hyphens) returned 200, so the rule counts characters and does not require any digit.
+- [x] Comments posted on issues #1 to #6, the `spec-gap` label created and applied to #3, and D-07 and D-08 filed.
+- [x] The resolved **TBC** entries are replaced in `docs/test_cases.md`.
+- [x] The OpenAPI spec, the API and the automated tests were used to settle the open API questions.
+- [ ] Confirm that issue #7 describes the session-expiry cause (`rewrite-d07.sh`), and attach a screenshot.
+- [ ] File D-09 (upper date-of-birth limit) and add the exact cutoff once it is found.
+- [ ] Optional: check whether other authenticated actions (profile update, favorites, invoices) show the same raw "Unauthorized" with an invalid session.
+- [ ] Tick the session 02 item in the README roadmap.
